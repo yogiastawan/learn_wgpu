@@ -1,0 +1,30 @@
+[package]
+name = "wgpu_game"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sdl2 = { version = "0.37.0", features = ["raw-window-handle"] }
+wgpu = "22.1.0"
+env_logger = "0.11.5"
+log = "0.4.22"
+pollster = "0.3.0"
+
+
+[target.'cfg(target_os = "android")'.lib]
+name = "wgpu_game"
+crate-type = ["cdylib"]
+
+[target.'cfg(not(target_os = "android"))'.bin]
+name = "wgpu_game"
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = "symbols"
+codegen-units = 1
+
+[profile.release.package."*"]
+opt-level = "z"
+strip = "symbols"
+codegen-units = 1
