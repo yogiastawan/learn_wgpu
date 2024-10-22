@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sdl2 = { version = "0.37.0", features = ["raw-window-handle"] }
+sdl2 = { version = "0.37.0", default-features = false, features = [
+    "raw-window-handle"
+] }
 wgpu = "22.1.0"
 env_logger = "0.11.5"
 log = "0.4.22"
@@ -17,6 +19,7 @@ crate-type = ["cdylib"]
 
 [target.'cfg(not(target_os = "android"))'.bin]
 name = "wgpu_game"
+
 
 [profile.release]
 lto = true

@@ -5,9 +5,10 @@ use log::info;
 
 use sdl2::{event::Event, keyboard::Keycode, video::Window, EventPump};
 use wgpu::{
-    Adapter, Backends, CommandEncoderDescriptor, Device, DeviceDescriptor, Instance, Queue,
-    RenderPipeline, RequestAdapterOptions, Surface, SurfaceCapabilities, SurfaceConfiguration,
-    SurfaceTargetUnsafe, TextureFormat,
+    include_wgsl, Adapter, Backends, BlendState, ColorWrites, CommandEncoderDescriptor, Device,
+    DeviceDescriptor, Instance, PipelineCompilationOptions, Queue, RenderPipeline,
+    RenderPipelineDescriptor, RequestAdapterOptions, Surface, SurfaceCapabilities,
+    SurfaceConfiguration, SurfaceTargetUnsafe, TextureFormat,
 };
 
 pub struct XApp<'l> {
@@ -90,7 +91,7 @@ impl<'l> XApp<'l> {
         });
 
         // create surface
-        self.init_surface(&instance)?;
+        self.init_surface(&instance);
         // get adapter
         let adapter = self.get_adapter(&instance)?;
 
@@ -116,6 +117,8 @@ impl<'l> XApp<'l> {
         *self.config.borrow_mut() = Some(config);
         // run surface configuration
         self.configure_surface()?;
+
+        *self.pipeline.borrow_mut() = Some(self.init_pipeline()?);
         Ok(())
     }
 
@@ -175,10 +178,11 @@ impl<'l> XApp<'l> {
                                     return Err("WGPU intance is empty".to_string());
                                 }
                             };
-                            self.init_surface(inst);
+                            let _ = self.init_surface(inst)?;
                         }
                     }
                     e => {
+                        #[cfg(debug_assertions)]
                         info!("{:?}", e);
                     }
                 }
@@ -386,7 +390,7 @@ impl<'l> XApp<'l> {
             });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -405,6 +409,9 @@ impl<'l> XApp<'l> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            render_pass.set_pipeline(self.pipeline.borrow().as_ref().unwrap());
+            render_pass.draw(0..3, 0..1)
         }
 
         self.queue
@@ -417,7 +424,61 @@ impl<'l> XApp<'l> {
         Ok(())
     }
 
-    fn init_pipeline(&self) -> Result<(), String> {
-        Ok(())
+    fn init_pipeline(&self) -> Result<RenderPipeline, String> {
+        let device = self.device.borrow();
+        let device = match device.as_ref() {
+            Some(x) => x,
+            None => return Err("Device of XApp is empty".to_string()),
+        };
+        let shader = device.create_shader_module(include_wgsl!("shader.wgsl"));
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("pipe_line_layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let color_target = [Some(wgpu::ColorTargetState {
+            format: self.surface_format.borrow().unwrap(),
+            blend: Some(BlendState::REPLACE),
+            write_mask: ColorWrites::ALL,
+        })];
+        let pipeline_desc = RenderPipelineDescriptor {
+            label: Some("render_pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &color_target,
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+
+            multiview: None,
+            cache: None,
+        };
+
+        let render_pipeline = device.create_render_pipeline(&pipeline_desc);
+        Ok(render_pipeline)
     }
 }
