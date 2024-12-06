@@ -5,12 +5,13 @@ edition = "2021"
 
 [dependencies]
 sdl2 = { version = "0.37.0", default-features = false, features = [
-    "raw-window-handle"
+    "raw-window-handle",
 ] }
-wgpu = "22.1.0"
+wgpu = "23.0.1"
 env_logger = "0.11.5"
 log = "0.4.22"
 pollster = "0.3.0"
+bytemuck = { version = "1.20.0", features = ["derive"] }
 
 
 [target.'cfg(target_os = "android")'.lib]
